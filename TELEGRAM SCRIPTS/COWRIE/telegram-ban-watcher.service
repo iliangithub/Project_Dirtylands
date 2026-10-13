@@ -1,0 +1,59 @@
+# /etc/systemd/system/telegram-ban-watcher.service  —  root:root 0644
+#
+# QUE ES: la unidad de systemd que mantiene vivo a telegram-ban-watcher.
+# Se encarga de arrancarlo al encender la VPS y de resucitarlo si se muere,
+# para que el boton de Telegram no deje de funcionar sin que te enteres.
+#
+# LOS CANDADOS DE ABAJO: el servicio necesita root solo para hablar con
+# nftables, asi que se le quita todo lo demas. Aunque lo comprometieran, no
+# podria escribir fuera del directorio "state" ni cargar modulos del kernel.
+#
+# COMO SE INSTALA:
+#
+#     sudo install -o root -g root -m 0644 \
+#       "/opt/dirtyland/Telegram Reports/telegram-ban-watcher.service" \
+#       /etc/systemd/system/
+#     sudo systemctl daemon-reload
+#     sudo systemctl enable --now telegram-ban-watcher
+#
+# COMO SE COMPRUEBA:
+#
+#     sudo systemctl status telegram-ban-watcher
+#     sudo journalctl -u telegram-ban-watcher -f
+#
+# SI LO EDITAS, hay que recargar systemd para que se entere:
+#
+#     sudo systemctl daemon-reload && sudo systemctl restart telegram-ban-watcher
+
+[Unit]
+Description=Aplica en nftables los baneos pedidos desde Telegram (dirtyland)
+Documentation=file:/usr/local/sbin/telegram-ban-watcher
+After=network-pre.target nftables.service
+Wants=nftables.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/telegram-ban-watcher
+Restart=always
+RestartSec=5
+
+# Necesita root solo para nft; todo lo demas, cerrado.
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+
+# LAS COMILLAS SON OBLIGATORIAS. ReadWritePaths es una lista separada por
+# espacios, y "Telegram Reports" lleva uno: sin comillas systemd entiende
+# dos rutas ("/opt/dirtyland/Telegram" y "Reports/state"), la primera no
+# existe, y el servicio muere con 226/NAMESPACE en bucle infinito.
+ReadWritePaths="/opt/dirtyland/Telegram Reports/state"
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,204 @@
+#!/bin/sh
+# /usr/local/sbin/telegram-notification-ban  —  root:root 0755
+#
+# QUE ES: el unico programa de todo el sistema que aplica reglas de
+# cortafuegos. Recibe UNA IP, la valida, y la mete en el set de nftables
+# que descarta su trafico. No habla con Telegram ni sabe que existe.
+#
+# QUIEN LO LLAMA: telegram-ban-watcher, una vez por cada IP que aparece en
+# la cola. Tambien puedes llamarlo tu a mano para banear algo al vuelo:
+#
+#     sudo /usr/local/sbin/telegram-notification-ban 159.203.64.55
+#
+# COMO SE INSTALA (junto con el watcher, ambos van a /usr/local/sbin):
+#
+#     sudo install -o root -g root -m 0755 \
+#       "/opt/dirtyland/Telegram Reports/telegram-notification-ban" \
+#       "/opt/dirtyland/Telegram Reports/telegram-ban-watcher" \
+#       /usr/local/sbin/
+#
+# COMO SE COMPRUEBA:
+#
+#     sudo /usr/local/sbin/telegram-notification-ban 203.0.113.99
+#     sudo nft list set inet dirtyland ban4          # debe aparecer, con comentario
+#     sudo nft delete element inet dirtyland ban4 { 203.0.113.99 }
+#
+# PARA VER O QUITAR BANEOS:
+#
+#     sudo nft list set inet dirtyland ban4                     # los baneados v4
+#     sudo nft list set inet dirtyland ban6                     # los baneados v6
+#     sudo nft delete element inet dirtyland ban4 { 1.2.3.4 }   # desbanear
+#
+# OJO: nftables NO sobrevive al reinicio salvo que lo guardes:
+#
+#     sudo nft list ruleset | sudo tee /etc/nftables.conf
+#     sudo systemctl enable nftables
+#
+# Por que existe este wrapper en vez de dar sudo sobre nft directamente:
+# nft une sus argumentos con espacios y reparsea el resultado como script,
+# asi que un sudoers con comodin ("nft add element ... *") permitiria colar
+# "; flush ruleset" y cargarse el cortafuegos. Aqui solo se acepta UN
+# argumento, se valida como direccion IP, y el script de nft lo construye
+# root. El comentario, ademas, solo sobrevive si va entre comillas de
+# verdad, cosa que por argv es imposible.
+#
+# Uso:  telegram-notification-ban <IP>
+# Sale 0 si la IP queda bloqueada, !=0 si no.
+
+set -eu
+
+# La ruta se puede sustituir SOLO para las pruebas, que necesitan un nft de
+# mentira para comprobar que pasa al banear dos veces la misma IP. En
+# produccion esto llega por "sudo -n", y sudo limpia el entorno por defecto
+# (env_reset), asi que esa variable no cruza: quien pudiera ponerla ya seria
+# root.
+NFT="${NFT:-/usr/sbin/nft}"
+TABLE="inet dirtyland"
+IP="${1:-}"
+[ -n "$IP" ] || { echo "uso: $0 <IP> [auto|manual]" >&2; exit 2; }
+[ $# -le 2 ] || { echo "solo se admiten dos argumentos" >&2; exit 2; }
+
+# DE DONDE VIENE EL BANEO. Antes el comentario era fijo, asi que un baneo
+# automatico y uno pulsado a mano quedaban indistinguibles en la tabla y no
+# habia forma de contarlos por separado.
+#
+# LA LISTA BLANCA NO ES PARANOIA: este texto acaba dentro de un
+# `add element ... { IP comment "TEXTO" }` que nft REPARSEA como script. Es
+# exactamente el motivo por el que existe este envoltorio en vez de dar sudo
+# sobre nft, asi que el segundo argumento se valida igual de estricto que el
+# primero: solo dos valores posibles, y nada mas pasa de aqui.
+# El texto de "manual" NO es el que habia antes ---era "POR ADMIN DESDE
+# TELEGRAM"--- y el cambio es a proposito: hasta el 2026-08-29 los dos caminos
+# escribian ese mismo texto, asi que un baneo viejo es indistinguible de uno
+# manual nuevo. Cambiando la etiqueta, lo que lleve la vieja se reconoce como
+# lo que es: de antes, y de origen desconocido. Se vacia solo segun caducan.
+case "${2:-manual}" in
+    auto)   COMMENT="IP BANEADA COWRIE AUTOMATICO" ;;
+    manual) COMMENT="IP BANEADA COWRIE MANUAL DESDE TELEGRAM" ;;
+    *) echo "origen no valido: solo auto o manual" >&2; exit 2 ;;
+esac
+
+# --- Validacion estricta. Nada que no sea una IP limpia pasa de aqui.
+case "$IP" in
+    *[!0-9A-Fa-f.:]*) echo "caracteres no validos en la IP" >&2; exit 2 ;;
+esac
+if printf '%s' "$IP" | grep -Eq '^([0-9]{1,3}\.){3}[0-9]{1,3}$'; then
+    for octet in $(printf '%s' "$IP" | tr '.' ' '); do
+        [ "$octet" -le 255 ] || { echo "octeto fuera de rango" >&2; exit 2; }
+    done
+    SET=ban4
+elif printf '%s' "$IP" | grep -Eq '^[0-9A-Fa-f:]+$' && \
+     printf '%s' "$IP" | grep -q ':'; then
+    SET=ban6
+else
+    echo "no parece una IP: $IP" >&2
+    exit 2
+fi
+
+# --- Nunca contra nosotros mismos: cinturon ademas del que ya trae el plugin.
+case "$IP" in
+    10.*|127.*|192.168.*|169.254.*|::1|fe80:*|fc*:*|fd*:*)
+        echo "IP propia/privada: no se banea" >&2; exit 3 ;;
+    172.1[6-9].*|172.2[0-9].*|172.3[01].*)
+        echo "IP propia/privada: no se banea" >&2; exit 3 ;;
+esac
+
+# --- Estructura minima, idempotente (no toca nada de lo que ya tengas).
+$NFT list table $TABLE >/dev/null 2>&1 || $NFT add table $TABLE
+$NFT add set $TABLE ban4 '{ type ipv4_addr; flags interval; }' 2>/dev/null || true
+$NFT add set $TABLE ban6 '{ type ipv6_addr; flags interval; }' 2>/dev/null || true
+# --- ACTUALIZACION EN SITIO, SIN PERDER LOS BANEOS ---------------------------
+# Las cadenas solo se crean si no existen, asi que una maquina que ya las tenia
+# montadas por una version anterior nunca cogeria el `counter`. Y mandar a una
+# persona a borrar cadenas a mano en un cortafuegos en marcha es justo el tipo
+# de paso que sale mal.
+#
+# Se detecta la version vieja ---tiene la regla del set pero sin contador--- y
+# se rehace la cadena. Los SETS no se tocan: las IP baneadas viven ahi, no en
+# las cadenas, asi que no se pierde ni un baneo.
+for _ch in input forward; do
+    if $NFT list chain $TABLE $_ch >/dev/null 2>&1 &&
+       $NFT list chain $TABLE $_ch 2>/dev/null | grep -q 'saddr @ban' &&
+       ! $NFT list chain $TABLE $_ch 2>/dev/null | grep -q 'counter'; then
+        echo "actualizando la cadena $_ch para que lleve contador" >&2
+        $NFT flush chain $TABLE $_ch
+        $NFT delete chain $TABLE $_ch
+    fi
+done
+
+if ! $NFT list chain $TABLE input >/dev/null 2>&1; then
+    $NFT add chain $TABLE input '{ type filter hook input priority -10; policy accept; }'
+    $NFT add rule $TABLE input ip saddr @ban4 counter drop
+    $NFT add rule $TABLE input ip6 saddr @ban6 counter drop
+fi
+
+# El `counter` de las reglas no es decorativo: sin el, comprobar que un baneo
+# esta cortando trafico obliga a contar cuantas veces aparece la IP en el
+# cowrie.json, esperar unos minutos y volver a contar. Con el, un
+# `nft list table inet dirtyland` dice cuantos paquetes ha tirado cada cadena,
+# al instante y para siempre.
+#
+# --- Y EN FORWARD, QUE ES POR DONDE PASA EL SENUELO --------------------------
+# Con solo la cadena de input, este baneo NO servia para lo que se usa. El
+# trafico del atacante no va dirigido al anfitrion: llega, el DNAT lo reescribe
+# hacia 172.20.0.10 o .20, y desde ese momento es trafico para OTRA maquina, asi
+# que la decision de rutado lo manda a forward y no toca input jamas.
+#
+# Es el mismo razonamiento que ya esta escrito en la parte 4 del cortafuegos,
+# cuando se quito de input el "tcp dport 22 accept": "nunca sirvio para nada, el
+# trafico del senuelo se resuelve en forward tras el DNAT".
+#
+# Resultado: se pulsaba el boton, la IP entraba en @ban4, el bot decia que
+# quedaba baneada... y seguia entrando a Cowrie como si nada. El baneo solo
+# habria frenado algo dirigido al propio anfitrion, como el 56769 de
+# administracion.
+#
+# La prioridad -10 deja esta cadena ANTES que la "inet filter" de la parte 4
+# (prioridad 0), asi que la IP baneada se cae antes de que aquella decida nada.
+# La politica es accept para no interferir con el resto: lo unico que hace esta
+# cadena es tirar lo que este en los sets.
+if ! $NFT list chain $TABLE forward >/dev/null 2>&1; then
+    $NFT add chain $TABLE forward '{ type filter hook forward priority -10; policy accept; }'
+    $NFT add rule $TABLE forward ip saddr @ban4 counter drop
+    $NFT add rule $TABLE forward ip6 saddr @ban6 counter drop
+fi
+
+# --- SI YA ESTABA, no se toca y se sale bien.
+#
+# nftables da error al anadir un elemento que ya existe, y con "set -e" eso
+# tumbaba el guion: pulsar el boton sobre una IP ya baneada devolvia un fallo
+# ---en un caso que no es un fallo, porque el resultado que se buscaba ya
+# esta--- y el boton se quedaba con un aviso de error.
+#
+# Pasa mas de lo que parece: el aviso de una IP puede seguir en el chat
+# despues de banearla, y ese boton sigue ahi para pulsarlo. Es idempotente a
+# proposito, como el resto de pasos que se pueden repetir.
+#
+# Y NO se reescribe el comentario del que ya estaba: si una IP se baneo sola
+# y despues alguien pulsa el boton, sigue siendo un baneo automatico. Lo que
+# cuenta es de donde salio, no quien lo repitio.
+if $NFT list set $TABLE $SET 2>/dev/null | grep -qF "$IP"; then
+    logger -t telegram-notification-ban "ya estaba baneada: $IP"
+    echo "$IP ya estaba en $SET"
+    exit 0
+fi
+
+# --- El baneo, con el comentario por IP. Si la version de nftables no
+#     soporta comentarios en elementos (< 0.9.7), se banea igual sin el.
+if $NFT -f - <<EOF 2>/dev/null
+add element $TABLE $SET { $IP comment "$COMMENT" }
+EOF
+then
+    :
+else
+    $NFT add element $TABLE $SET "{ $IP }"
+fi
+
+# --- Verificacion real: no damos por bueno un exit 0 a ciegas.
+$NFT list set $TABLE $SET | grep -qF "$IP" || {
+    echo "la IP no aparece en el set tras el intento" >&2
+    exit 1
+}
+
+logger -t telegram-notification-ban "$COMMENT: $IP"
+echo "$IP en $SET"

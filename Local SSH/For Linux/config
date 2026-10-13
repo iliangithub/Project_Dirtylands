@@ -1,0 +1,95 @@
+
+# ============================================================
+# Dirtyland: acceso administrativo via proxy SOCKS5 de Mullvad
+# ============================================================
+#
+# PLANTILLA PARA LINUX. Se anade al final de ~/.ssh/config y se
+# rellenan los huecos que van entre < >, que se repiten en los tres
+# bloques:
+#
+#   <IP a la que te vas a conectar>   IP publica de la VPS
+#   <Futuro puerto SSH>               el puerto del apartado 3.2.6.3
+#   <proxy principal>                 relay SOCKS5 de Mullvad, sin el
+#                                     sufijo .relays.mullvad.net
+#   <proxy-respaldo-1> / -2           otros dos, en paises distintos
+#   <pais-1> / <pais-2>               solo el nombre del alias: se, nl,
+#                                     fr... lo que te sirva para saber
+#                                     cual es cual de un vistazo
+#
+# Los nombres de los relays salen del comando del apartado 3.2.6.1.
+# Son tres bloques iguales con distinto proxy: uno principal y dos de
+# respaldo, para que la baja de un relay no te deje sin acceso.
+#
+# La unica diferencia con la plantilla de Windows es la linea del
+# ProxyCommand: aqui netcat, alli el connect.exe de Git.
+#
+# Funcionamiento: el tunel de Mullvad da acceso a la red interna
+# del proveedor. Dentro de ella se alcanza el proxy SOCKS5 fijado
+# en cada bloque, y es ese proxy quien establece la conexion final
+# con la VPS. Por tanto el cortafuegos remoto ve siempre la misma
+# direccion de origen, con independencia del relay al que estemos
+# conectados.
+#
+# Consecuencias practicas:
+#   1. Da igual el pais del relay (Espana, Francia, Japon...).
+#      Los proxies indicados abajo no varian.
+#   2. La rotacion de clave WireGuard deja de afectar al acceso.
+#   3. Sin el tunel levantado los proxies quedan inalcanzables
+#      (resuelven a 10.124.0.x), asi que el fallo es en cerrado:
+#      resulta imposible llegar a la VPS con la IP residencial.
+#   4. Solo estos tres alias usan proxy. El resto del trafico
+#      del equipo sale por la ruta habitual.
+#
+# Mantenimiento: si Mullvad da de baja o renumera alguno de estos
+# servidores se pierde el acceso por el. La VPS lo vigila sola cada 30 min
+# (proxy-watch.sh, apartado 3.4.4) y avisa por Telegram al caer uno.
+# Via de emergencia: consola web del proveedor.
+
+# ------------------------------------------------------------
+# Principal
+# Proxy: <proxy principal>
+# ------------------------------------------------------------
+Host dirtyland
+    # IP publica de la VPS
+    HostName <IP a la que te vas a conectar>
+    Port <Futuro puerto SSH>
+    # esto es el usuario de la vps
+    User user
+    # esto es la clave privada con la que accedemos a la VPS
+    IdentityFile ~/.ssh/honeypot_vps
+    IdentitiesOnly yes
+    # Un latido cada 30 s. NO es opcional yendo por el proxy: un canal
+    # callado se corta, y cualquier orden que tarde ---regenerar la tabla
+    # de paises baja 45 MB--- se lleva la sesion por delante con un
+    # "broken pipe" a medio despliegue.
+    ServerAliveInterval 30
+    ServerAliveCountMax 6
+    ProxyCommand /usr/bin/nc -X 5 -x <proxy principal>.relays.mullvad.net:1080 %h %p
+
+# ------------------------------------------------------------
+# Respaldo 1
+# Proxy: <proxy-respaldo-1>
+# ------------------------------------------------------------
+Host dirtyland-<pais-1>
+    HostName <IP a la que te vas a conectar>
+    Port <Futuro puerto SSH>
+    User user
+    IdentityFile ~/.ssh/honeypot_vps
+    IdentitiesOnly yes
+    ServerAliveInterval 30
+    ServerAliveCountMax 6
+    ProxyCommand /usr/bin/nc -X 5 -x <proxy-respaldo-1>.relays.mullvad.net:1080 %h %p
+
+# ------------------------------------------------------------
+# Respaldo 2
+# Proxy: <proxy-respaldo-2>
+# ------------------------------------------------------------
+Host dirtyland-<pais-2>
+    HostName <IP a la que te vas a conectar>
+    Port <Futuro puerto SSH>
+    User user
+    IdentityFile ~/.ssh/honeypot_vps
+    IdentitiesOnly yes
+    ServerAliveInterval 30
+    ServerAliveCountMax 6
+    ProxyCommand /usr/bin/nc -X 5 -x <proxy-respaldo-2>.relays.mullvad.net:1080 %h %p

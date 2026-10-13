@@ -1,0 +1,17 @@
+# Todo el contenido de este repositorio acaba ejecutandose en Linux, asi que se
+# guarda y se entrega SIEMPRE con finales de linea LF, se descargue desde donde
+# se descargue.
+#
+# Sin esto, una descarga en Windows entrega los scripts con CRLF y el shebang
+# pasa a ser "#!/bin/sh\r". El kernel busca entonces un interprete llamado
+# "/bin/sh\r", que no existe, y systemd responde con un 203/EXEC que no dice
+# nada de finales de linea. Es un fallo que solo aparece al copiar el fichero
+# desde el repositorio, no al escribirlo a mano en la maquina.
+* text=auto eol=lf
+
+# Y lo que es binario se deja en paz: normalizarlo lo corrompe.
+*.tar.gz binary
+*.gz     binary
+*.pickle binary
+*.png    binary
+*.jpg    binary

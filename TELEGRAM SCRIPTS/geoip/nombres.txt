@@ -1,0 +1,254 @@
+# CC ISO 3166-1 -> nombre en espanol.
+# Generado con: generar-tabla-paises.py --nombres
+# Fuente: paquete iso-codes de Debian. No se edita a mano.
+AD Andorra
+AE Emiratos Arabes Unidos
+AF Afganistan
+AG Antigua y Barbuda
+AI Anguila
+AL Albania
+AM Armenia
+AO Angola
+AP Asia-Pacifico
+AQ Antartida
+AR Argentina
+AS Samoa Estadounidense
+AT Austria
+AU Australia
+AW Aruba
+AX Islas Aland
+AZ Azerbaiyan
+BA Bosnia y Herzegovina
+BB Barbados
+BD Banglades
+BE Belgica
+BF Burquina Faso
+BG Bulgaria
+BH Barein
+BI Burundi
+BJ Benin
+BL San Bartolome
+BM Islas Bermudas
+BN Brunei Darussalam
+BO Bolivia
+BQ Caribe Neerlandes
+BR Brasil
+BS Bahamas
+BT Butan
+BV Isla Bouvet
+BW Botsuana
+BY Bielorrusia
+BZ Belice
+CA Canada
+CC Islas Cocos (Keeling)
+CD Rep. Dem. del Congo
+CF Rep. Centroafricana
+CG Congo
+CH Suiza
+CI Costa de Marfil
+CK Islas Cook
+CL Chile
+CM Camerun
+CN China
+CO Colombia
+CR Costa Rica
+CU Cuba
+CV Cabo Verde
+CW Curazao
+CX Isla de Navidad
+CY Chipre
+CZ Chequia
+DE Alemania
+DJ Yibuti
+DK Dinamarca
+DM Dominica
+DO Republica Dominicana
+DZ Algeria
+EC Ecuador
+EE Estonia
+EG Egipto
+EH Sahara Occidental
+ER Eritrea
+ES Espana
+ET Etiopia
+EU Union Europea
+FI Finlandia
+FJ Fiyi
+FK Islas Malvinas
+FM Micronesia
+FO Islas Feroe
+FR Francia
+GA Gabon
+GB Reino Unido
+GD Granada
+GE Georgia
+GF Guayana Francesa
+GG Guernsey
+GH Ghana
+GI Gibraltar
+GL Groenlandia
+GM Gambia
+GN Guinea
+GP Guadalupe
+GQ Guinea Ecuatorial
+GR Grecia
+GS Georgias del Sur
+GT Guatemala
+GU Guam
+GW Guinea-Bisau
+GY Guyana
+HK Hong Kong
+HM Islas Heard y McDonald
+HN Honduras
+HR Croacia
+HT Haiti
+HU Hungria
+ID Indonesia
+IE Irlanda
+IL Israel
+IM Isla de Man
+IN India
+IO Terr. Britanico del Indico
+IQ Irak
+IR Iran
+IS Islandia
+IT Italia
+JE Jersey
+JM Jamaica
+JO Jordania
+JP Japon
+KE Kenia
+KG Kirguistan
+KH Camboya
+KI Kiribati
+KM Comoras
+KN San Cristobal y Nieves
+KP Corea del Norte
+KR Corea del Sur
+KW Kuwait
+KY Islas Caiman
+KZ Kazajistan
+LA Laos
+LB Libano
+LC Santa Lucia
+LI Liechtenstein
+LK Sri Lanka
+LR Liberia
+LS Lesoto
+LT Lituania
+LU Luxemburgo
+LV Letonia
+LY Libia
+MA Marruecos
+MC Monaco
+MD Moldavia
+ME Montenegro
+MF San Martin
+MG Madagascar
+MH Islas Marshall
+MK Macedonia del Norte
+ML Mali
+MM Birmania
+MN Mongolia
+MO Macao
+MP Marianas del Norte
+MQ Martinica
+MR Mauritania
+MS Montserrat
+MT Malta
+MU Mauricio
+MV Islas Maldivas
+MW Malaui
+MX Mexico
+MY Malasia
+MZ Mozambique
+NA Namibia
+NC Nueva Caledonia
+NE Niger
+NF Isla Norfolk
+NG Nigeria
+NI Nicaragua
+NL Paises Bajos
+NO Noruega
+NP Nepal
+NR Nauru
+NU Niue
+NZ Nueva Zelanda
+OM Oman
+PA Panama
+PE Peru
+PF Polinesia Francesa
+PG Papua Nueva Guinea
+PH Filipinas
+PK Pakistan
+PL Polonia
+PM San Pedro y Miquelon
+PN Pitcairn
+PR Puerto Rico
+PS Palestina
+PT Portugal
+PW Palaos
+PY Paraguay
+QA Catar
+RE Reunion
+RO Rumania
+RS Serbia
+RU Rusia
+RW Ruanda
+SA Arabia Saudi
+SB Islas Salomon
+SC Seychelles
+SD Sudan
+SE Suecia
+SG Singapur
+SH Santa Elena
+SI Eslovenia
+SJ Svalbard y Jan Mayen
+SK Eslovaquia
+SL Sierra Leona
+SM San Marino
+SN Senegal
+SO Somalia
+SR Surinam
+SS Sudan del Sur
+ST Santo Tome y Principe
+SV El Salvador
+SX Sint Maarten
+SY Siria
+SZ Esuatini
+TC Islas Turcas y Caicos
+TD Chad
+TF Terr. Australes Franceses
+TG Togo
+TH Tailandia
+TJ Tayikistan
+TK Tokelau
+TL Timor Oriental
+TM Turkmenistan
+TN Tunez
+TO Tonga
+TR Turquia
+TT Trinidad y Tobago
+TV Tuvalu
+TW Taiwan
+TZ Tanzania
+UA Ucrania
+UG Uganda
+UM Islas Menores de EE.UU.
+US Estados Unidos
+UY Uruguay
+UZ Uzbekistan
+VA Vaticano
+VC San Vicente y Granadinas
+VE Venezuela
+VG Islas Virgenes Britanicas
+VI Islas Virgenes de EE.UU.
+VN Vietnam
+VU Vanuatu
+WF Wallis y Futuna
+WS Samoa
+YE Yemen
+YT Mayotte
+ZA Sudafrica
+ZM Zambia
+ZW Zimbabue

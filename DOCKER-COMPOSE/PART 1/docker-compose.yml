@@ -1,0 +1,111 @@
+name: dirtyland
+
+networks:
+  dirtyland_net:
+    name: dirtyland_net
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: dirtyland0
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+
+volumes:
+  cowrie-var:
+  dionaea-var:
+
+services:
+  cowrie:
+    # Version FIJADA: los modulos de comandos parcheados dependen de la API
+    # interna de Cowrie, que cambio en 3.0.11. Ver el aviso del apartado 3.4.
+    image: cowrie/cowrie:3.0.10
+    container_name: dirtyland_cowrie
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 200
+    mem_limit: 512m
+    cpus: 1.0
+    networks:
+      dirtyland_net:
+        ipv4_address: 172.20.0.10
+    ports:
+      - "[IP VPS]:22:2222"
+      # El 23 va atado a la MISMA IP que el 22: los dos son el mismo equipo
+      # Debian. Sin ese prefijo Docker lo publicaria en 0.0.0.0 y el telnet
+      # apareceria tambien en la IP de Dionaea, que se presenta como Windows.
+      - "[IP VPS]:23:2223"
+    environment:
+      - TZ=Europe/Kyiv
+    volumes:
+      - cowrie-var:/cowrie/cowrie-git/var
+      - /opt/dirtyland/cowrie/etc/cowrie.cfg:/cowrie/cowrie-git/etc/cowrie.cfg:ro
+      - /opt/dirtyland/cowrie/etc/userdb.txt:/cowrie/cowrie-git/etc/userdb.txt:ro
+
+  dionaea:
+    # Version FIJADA por digest, no "latest", y por dos motivos. Uno: montamos
+    # un fichero interno suyo (tds.py, ver abajo), y con "latest" una imagen
+    # nueva podria traer ese modulo cambiado y quedarse con nuestra copia
+    # vieja encima, sin dar ningun error. Dos: es el mismo criterio que ya se
+    # aplica a Cowrie en este fichero.
+    #
+    # Para actualizar a proposito: mirar que trae la nueva, rehacer el parche
+    # del apartado 3.4 y cambiar el digest aqui.
+    image: cowrie/dionaea@sha256:7c3c1b7e3b0476f9ac17c4568979eb4d6c35c2f56ee1a5b6f3d835267babdc47
+    container_name: dirtyland_dionaea
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 200
+    mem_limit: 512m
+    cpus: 1.0
+    networks:
+      dirtyland_net:
+        ipv4_address: 172.20.0.20
+    ports:
+      - "[IP VPS 2]:445:445"
+      - "[IP VPS 2]:135:135"
+      - "[IP VPS 2]:1433:1433"
+    environment:
+      # NO es opcional. La imagen no trae la configuracion hecha: la guarda en
+      # /opt/dionaea/template/etc y su entrypoint la copia al arrancar, pero
+      # solo si el directorio de destino no existe ("test ! -d
+      # /opt/dionaea/etc/dionaea && init_etc"). Al montar services-enabled
+      # DENTRO de esa ruta, Docker crea los padres por su cuenta, el
+      # directorio ya existe, la condicion falla y Dionaea arranca sin
+      # dionaea.cfg. Esta variable fuerza la copia igualmente.
+      #
+      # El sintoma, si falta, no apunta a la causa: bucle de reinicio con
+      # "Could not read config file: /opt/dionaea/etc/dionaea/dionaea.cfg".
+      - DIONAEA_FORCE_INIT_CONF=1
+    volumes:
+      - dionaea-var:/opt/dionaea/var
+      # Los servicios reducidos (3.4.3.1). Va montado desde el PRIMER arranque
+      # aunque el directorio este vacio: Dionaea arranca igual ---comprobado---
+      # y el entrypoint puebla services-available, que es de donde se copian
+      # los tres de serie. Ponerlo aqui evita tener que editar el compose a
+      # mano mas adelante.
+      #
+      # En SOLO LECTURA a proposito: en cada arranque el entrypoint intenta
+      # volver a enlazar los diecisiete servicios aqui dentro, y el montaje se
+      # lo impide. Los "cp: cannot create symbolic link ... Read-only file
+      # system" del log son eso, y son la senal de que funciona.
+      - /opt/dirtyland/dionaea/services-enabled:/opt/dionaea/etc/dionaea/services-enabled:ro
+      # El modulo TDS con la version de SQL Server cambiada (apartado 3.4). Sin
+      # esto, un "nmap -sV" contra el 1433 responde literalmente "Dionaea
+      # honeypot MS-SQL server": la firma esta en la base de datos de fabrica
+      # de nmap y reconoce el paquete de pre-login, que lleva la version a
+      # fuego. El fichero TIENE que existir antes del primer "up -d", o Docker
+      # crea un directorio con ese nombre y Dionaea no puede importar su modulo.
+      - /opt/dirtyland/dionaea/tds.py:/opt/dionaea/lib/dionaea/python/dionaea/mssql/include/tds.py:ro
+      # El mssql.py con el bucle arreglado (apartado 3.4). SIN ESTO, cualquiera
+      # cuelga el senuelo entero con un solo paquete: un Length de cabecera
+      # entre 1 y 3 hace que su bucle no avance y se quede dando vueltas para
+      # siempre. No se cae ---el contenedor sigue "Up" y el proceso vivo---,
+      # simplemente deja de atender y de anotar. Paso el 2026-08-23 (cinco
+      # dias) y otra vez el 28, noventa segundos despues de reiniciarlo.
+      #
+      # Mismo aviso que con tds.py: el fichero TIENE que existir antes del
+      # primer "up -d", o Docker crea un directorio con ese nombre y Dionaea
+      # no puede importar su modulo.
+      - /opt/dirtyland/dionaea/mssql.py:/opt/dionaea/lib/dionaea/python/dionaea/mssql/mssql.py:ro

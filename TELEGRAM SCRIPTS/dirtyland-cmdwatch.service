@@ -1,0 +1,12 @@
+[Unit]
+Description=Dirtyland host command watcher (Telegram alerts)
+After=network.target systemd-journald.service
+
+[Service]
+Type=simple
+ExecStart=/opt/dirtyland/monitor/comandos-watch.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,14 @@
+# El sello de version se rellena SOLO, al construir el tar.
+#
+# "export-subst" hace que `git archive` sustituya los marcadores $Format:...$
+# del fichero VERSION por el commit y la fecha de verdad. Como la copia que
+# viaja a la VPS se saca justamente con `git archive` (README 3.3), llega alla
+# diciendo de que commit es sin que nadie tenga que escribirlo.
+#
+# En NUESTRA copia de trabajo el fichero sigue teniendo los marcadores tal
+# cual, y esta bien asi: aqui ya esta el .git para preguntarselo a git.
+#
+# Esto es a proposito y no un hash a mano en un script: un numero que hay que
+# acordarse de cambiar en cada commit es un paso que se olvida, y entonces el
+# aviso miente ---que es peor que no tenerlo---.
+VERSION export-subst

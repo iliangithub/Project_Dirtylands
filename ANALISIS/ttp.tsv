@@ -1,0 +1,86 @@
+# ttp.tsv --- conducta observable -> tecnica de MITRE ATT&CK.
+#
+# Cuatro columnas separadas por TABULADOR: id, nombre, patron, nota.
+#
+# EL PATRON MANDA SOBRE EL NOMBRE. Se aplica con re.search, sin distinguir
+# mayusculas, sobre la linea de orden tal cual la teclearon. Una tecnica
+# puede tener varias filas: se suman.
+#
+# POR QUE ESTO ES UNA TABLA Y NO CODIGO. El mapeo comando->tecnica es la
+# parte que envejece: aparece un dropper nuevo, cambia un nombre de binario,
+# y hay que retocar un patron. Si vive en el codigo, cada retoque es un
+# commit en un fichero de 600 lineas y nadie lo revisa; aqui se ve la lista
+# entera de un vistazo y se compara con ATT&CK sin leer Python.
+#
+# Y UNA ADVERTENCIA QUE NO ES ADORNO. La columna ATT&CK del informe es
+# INFERIDA, siempre. Lo observado es que alguien tecleo "chmod +x"; que eso
+# sea T1222.002 es interpretacion nuestra, correcta o no. Por eso el informe
+# la saca en una columna aparte y no mezclada con los hechos. Mapear de mas
+# es peor que no mapear: una tecnica atribuida a la ligera es una afirmacion
+# falsa con aspecto de rigor.
+#
+# id	nombre	patron	nota
+#
+# --- Reconocimiento de la maquina ---------------------------------------
+T1082	Descubrimiento de información del sistema	\buname\b	Casi universal: es lo primero que hace un dropper para elegir binario
+T1082	Descubrimiento de información del sistema	/proc/cpuinfo|\blscpu\b|\bnproc\b	Cuentan nucleos: deciden si la maquina vale para minar
+T1082	Descubrimiento de información del sistema	/etc/os-release|/etc/issue|\bhostnamectl\b
+T1082	Descubrimiento de información del sistema	\bfree\b|/proc/meminfo
+T1033	Descubrimiento del usuario del sistema	\bwhoami\b|(^|;|&&|\|)\s*\bid\b
+T1087.001	Descubrimiento de cuentas locales	/etc/passwd|/etc/shadow|\bgetent\s+passwd\b
+T1057	Descubrimiento de procesos	\bps\s+(aux|-ef|ax)|\btop\b -b	Buscan mineros de la competencia tanto como defensas
+T1518.001	Descubrimiento de software de seguridad	\b(selinux|apparmor|clamav|fail2ban|aide|osquery)\b
+T1046	Descubrimiento de servicios de red	\b(nmap|masscan|zmap)\b
+T1049	Descubrimiento de conexiones de red	\b(netstat|ss)\s+-|\blsof\s+-i
+T1016	Descubrimiento de la configuración de red	\bip\s+a(ddr)?\b|\bifconfig\b|/etc/resolv\.conf
+T1083	Descubrimiento de ficheros y directorios	\bls\s+-la\s+/home|\bfind\s+/\s
+T1622	Evasión por detección de depurador o virtualización	\b(dmidecode|virt-what|systemd-detect-virt)\b	Miran si estan en una maquina virtual: en un senuelo, esto importa
+#
+# --- Acceso -------------------------------------------------------------
+T1110.001	Fuerza bruta por adivinación de contraseña	^__LOGIN_FALLIDO__$	Fila especial: no casa con órdenes, la cuenta el propio informe
+T1078	Cuentas válidas	^__LOGIN_EXITOSO__$	Igual que la anterior
+#
+# --- Ejecucion ----------------------------------------------------------
+T1059.004	Intérprete de órdenes de Unix	\b(sh|bash|dash|ash)\s+-c\b|\|\s*(sh|bash)\b
+T1059.006	Intérprete de Python	\bpython[23]?\s+-c\b
+T1204.002	Ejecución por el usuario de un fichero malicioso	\./[A-Za-z0-9._-]+	Lanzan lo que acaban de subir
+#
+# --- Traer herramientas -------------------------------------------------
+T1105	Transferencia de herramientas al objetivo	\b(wget|curl)\b
+T1105	Transferencia de herramientas al objetivo	\b(tftp|ftpget|scp|sftp)\b
+T1105	Transferencia de herramientas al objetivo	\bbusybox\s+(wget|tftp)\b	El clasico de Mirai: busybox donde no hay wget
+#
+# --- Persistencia -------------------------------------------------------
+T1098.004	Manipulación de claves autorizadas de SSH	authorized_keys|\bssh-keygen\b	La persistencia mas comun en este senuelo
+T1543.002	Servicio de systemd	\bsystemctl\s+(enable|daemon-reload)\b|/etc/systemd/system/
+T1053.003	Tarea programada con cron	\bcrontab\b|/etc/cron|/var/spool/cron
+T1546.004	Arranque por perfil de shell	\.bashrc|\.profile|/etc/rc\.local
+T1136.001	Creación de cuenta local	\b(useradd|adduser)\b
+#
+# --- Evasion ------------------------------------------------------------
+T1070.003	Borrado del historial de órdenes	\bhistory\s+-c\b|\.bash_history
+T1070.004	Borrado de ficheros	\brm\s+-rf?\b	Mirar el destino antes de concluir nada: tambien borran rivales
+T1222.002	Cambio de permisos de fichero en Linux	\bchmod\b|\bchown\b
+T1562.004	Desactivar o modificar el cortafuegos	\b(iptables|nftables|nft|ufw|firewalld)\b
+T1562.001	Desactivar herramientas de seguridad	\bsetenforce\s+0\b|\bsystemctl\s+(stop|disable)\s+(fail2ban|apparmor|firewalld)
+T1489	Parada de servicio	\bsystemctl\s+stop\b|\bservice\s+\S+\s+stop\b|\bkillall\b
+T1036.005	Suplantación por nombre o ubicación	\b(kworker|kthreadd|sshd|systemd|dbus)\b	Muy ruidoso: confirmar mirando el fichero, no el nombre
+T1027	Ficheros o información ofuscados	\bbase64\s+-d\b|\bxxd\s+-r\b|\becho\s+-e\s+.\\x
+T1140	Descifrado o decodificación de ficheros	\b(gunzip|tar\s+-?xz|openssl\s+enc)\b
+#
+# --- Credenciales -------------------------------------------------------
+T1552.004	Claves privadas	\.ssh/id_(rsa|ed25519|ecdsa)\b
+T1552.001	Credenciales en ficheros	\b(grep|cat)\b.*\b(password|secret|token|api[_-]?key)\b	No lleva "passwd": /etc/passwd ya es T1087.001 y contarlo dos veces inflaba la tabla
+#
+# --- Impacto ------------------------------------------------------------
+T1496	Secuestro de recursos	\b(xmrig|minerd|cpuminer|ccminer|nanominer|phoenixminer)\b	Mineria: el objetivo declarado de casi todo lo que entra aqui
+T1496	Secuestro de recursos	\b(stratum\+tcp|pool\.|--donate-level)\b	Configuracion de mineria, aunque el binario tenga otro nombre
+T1489	Parada de servicio	\b(pkill|kill\s+-9)\b.*\b(miner|xmrig|kdevtmpfsi)\b	Matan al minero del rival antes de poner el suyo
+#
+# --- Mando y control ----------------------------------------------------
+T1571	Puerto no estándar	:(1080|4444|8080|8888|31337|65535)\b
+T1095	Protocolo de capa no aplicativa	\bnc\s+(-[a-z]*e|\S+\s+\d+)|\bncat\b|/dev/tcp/
+#
+# --- Escalada -----------------------------------------------------------
+T1548.003	Sudo y cacheo de sudo	\bsudo\b|\bsu\s+-?\s*(root)?\b
+T1068	Explotación para escalada de privilegios	\b(dirtycow|pwnkit|CVE-\d{4}-\d+)\b

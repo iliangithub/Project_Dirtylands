@@ -1,0 +1,31 @@
+## Reglas de auditoria de Dirtyland.
+##
+## Se instala en /etc/audit/rules.d/dirtyland.rules, y de ahi las carga
+## augenrules al arrancar. Cargarlas con "auditctl -a" a mano tambien vale,
+## pero NO sobreviven a un reinicio: por eso van en un fichero.
+##
+## QUE VIGILA: la llamada al sistema execve, o sea CADA programa que se
+## ejecuta. Es el nivel al que no hay forma de esconderse ---para ejecutar
+## algo hay que pasar por ahi--- y es lo que el registro del shell no puede
+## ver: un "sh", un "python -c", un binario subido, o lo que lance un script.
+##
+## POR QUE auid>=1000, que es la clave de todo esto:
+##
+##   El auid es el usuario que SE AUTENTICO. Se fija al hacer login y NO SE
+##   PUEDE CAMBIAR despues: ni con sudo, ni con su, ni entrando en otro
+##   interprete. Se hereda por todos los procesos hijos.
+##
+##   Eso captura todo lo que hace una persona ---incluido lo que haga tras un
+##   "sudo su", que era el punto ciego del otro registro--- y deja fuera lo
+##   que no es una persona: cron, systemd, y TODO lo que pasa dentro de los
+##   contenedores, porque esos procesos no vienen de un login y no tienen
+##   auid. Sin ese filtro llegaria por duplicado cada orden de cada atacante
+##   de Cowrie, y el aviso seria inservible.
+##
+## POR QUE DOS LINEAS: una por arquitectura. Sin la de 32 bits, a alguien le
+## basta con ejecutar un binario de 32 para saltarse la auditoria entera.
+##
+## auid!=unset deja fuera los procesos sin login (auid = 4294967295).
+
+-a always,exit -F arch=b64 -S execve -F auid>=1000 -F auid!=unset -k dirtyland-exec
+-a always,exit -F arch=b32 -S execve -F auid>=1000 -F auid!=unset -k dirtyland-exec
