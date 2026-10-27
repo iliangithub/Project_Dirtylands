@@ -1,0 +1,17 @@
+- name: smb
+  config:
+    os_type: 4
+    os_arch: 64
+    primary_domain: WORKGROUP
+    oem_domain_name: WORKGROUP
+    server_name: WIN-K7M9XQ2P4RS
+    native_os: Windows 7 Professional 7601 Service Pack 1
+    native_lan_manager: Windows 7 Professional 6.1
+    shares:
+      IPC$:
+        comment: Remote IPC
+        type: ipc
+      ADMIN$:
+        comment: Remote Admin
+        path: 'C:\Windows'
+        type: disktree

@@ -1,0 +1,12 @@
+[Unit]
+Description=Dirtyland SSH watcher (Telegram alerts)
+After=network.target ssh.service
+
+[Service]
+Type=simple
+ExecStart=/opt/dirtyland/monitor/ssh-watch.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

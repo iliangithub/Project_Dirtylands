@@ -1,0 +1,64 @@
+[    0.000000] Linux version 6.12.74+deb13+1-amd64 (debian-kernel@lists.debian.org) (x86_64-linux-gnu-gcc-14 (Debian 14.2.0-19) 14.2.0, GNU ld (GNU Binutils for Debian) 2.44) #1 SMP PREEMPT_DYNAMIC Debian 6.12.74-2 (2026-03-08)
+[    0.000000] Command line: BOOT_IMAGE=/boot/vmlinuz-6.12.74+deb13+1-amd64 root=UUID=4f3a9c21-7d18-4e6b-9a52-c8b71f0e2d46 ro quiet
+[    0.000000] BIOS-provided physical RAM map:
+[    0.000000] BIOS-e820: [mem 0x0000000000000000-0x000000000009ffff] usable
+[    0.000000] BIOS-e820: [mem 0x00000000000a0000-0x00000000000fffff] reserved
+[    0.000000] BIOS-e820: [mem 0x0000000000100000-0x000000006e3d5fff] usable
+[    0.000000] BIOS-e820: [mem 0x000000006e3d6000-0x000000007a1cefff] reserved
+[    0.000000] BIOS-e820: [mem 0x000000007a1cf000-0x000000007a5cefff] ACPI NVS
+[    0.000000] BIOS-e820: [mem 0x000000007a5cf000-0x000000007affefff] ACPI data
+[    0.000000] BIOS-e820: [mem 0x0000000100000000-0x00000004317fffff] usable
+[    0.000000] NX (Execute Disable) protection: active
+[    0.000000] efi: EFI v2.8 by American Megatrends
+[    0.000000] SMBIOS 3.5.0 present.
+[    0.000000] DMI: Micro-Star International Co., Ltd. MS-7D25/PRO B660M-A WIFI (MS-7D25), BIOS 1.80 09/14/2022
+[    0.000000] tsc: Detected 2500.000 MHz processor
+[    0.000000] last_pfn = 0x431800 max_arch_pfn = 0x400000000
+[    0.000000] x86/PAT: Configuration [0-7]: WB  WC  UC- UC  WB  WP  UC- WT
+[    0.001000] Using GB pages for direct mapping
+[    0.002000] ACPI: Early table checksum verification disabled
+[    0.004000] ACPI: FACP 0x000000007A5D0000 000114 (v06 ALASKA A M I    01072009 AMI  00010013)
+[    0.006000] smpboot: Allowing 12 CPUs, 0 hotplug CPUs
+[    0.008000] Booting paravirtualized kernel on bare hardware
+[    0.010000] setup_percpu: NR_CPUS:8192 nr_cpumask_bits:12 nr_cpu_ids:12 nr_node_ids:1
+[    0.012000] Memory: 16305312K/16777216K available (16384K kernel code, 2298K rwdata, 10240K rodata, 3532K init, 4816K bss, 471904K reserved, 0K cma-reserved)
+[    0.015000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=12, Nodes=1
+[    0.018000] rcu: Preemptible hierarchical RCU implementation.
+[    0.022000] smp: Bringing up secondary CPUs ...
+[    0.030000] smpboot: CPU0: 12th Gen Intel(R) Core(TM) i5-12400 (family: 0x6, model: 0x97, stepping: 0x5)
+[    0.045000] smp: Brought up 1 node, 12 CPUs
+[    0.045500] smpboot: Total of 12 processors activated (59904.00 BogoMIPS)
+[    0.058000] devtmpfs: initialized
+[    0.062000] PM: Registering ACPI NVS region [mem 0x7a1cf000-0x7a5cefff] (4194304 bytes)
+[    0.071000] NET: Registered PF_INET protocol family
+[    0.084000] pci 0000:00:02.0: [8086:4692] type 00 class 0x030000
+[    0.089000] pci 0000:00:14.0: [8086:7ae0] type 00 class 0x0c0330
+[    0.093000] pci 0000:00:1f.3: [8086:7ad0] type 00 class 0x040300
+[    0.097000] pci 0000:01:00.0: [144d:a80a] type 00 class 0x010802
+[    0.112000] Serial: 8250/16550 driver, 4 ports, IRQ sharing enabled
+[    0.140000] loop: module loaded
+[    0.144000] nvme nvme0: pci function 0000:01:00.0
+[    0.152000] nvme nvme0: 12/0/0 default/read/poll queues
+[    0.156000] nvme0n1: p1 p2 p3
+[    0.171000] i915 0000:00:02.0: [drm] Found ALDERLAKE_S (device ID 4692) integrated display version 12.00
+[    0.188000] e1000e 0000:00:1f.6: Interrupt Throttling Rate (ints/sec) set to dynamic conservative
+[    0.310000] e1000e 0000:00:1f.6 eth0: (PCI Express:2.5GT/s:Width x1) 2c:f0:5d:8a:41:e6
+[    0.310500] e1000e 0000:00:1f.6 eth0: Intel(R) PRO/1000 Network Connection
+[    0.311000] e1000e 0000:00:1f.6 eth0: MAC: 15, PHY: 12, PBA No: FFFFFF-0FF
+[    0.325000] intel_pmc_core INT33A1:00: initialized
+[    0.340000] EXT4-fs (nvme0n1p2): mounted filesystem 4f3a9c21-7d18-4e6b-9a52-c8b71f0e2d46 ro with ordered data mode. Quota mode: none.
+[    0.341000] VFS: Mounted root (ext4 filesystem) readonly on device 259:2.
+[    0.352000] devtmpfs: mounted
+[    0.360000] Freeing unused kernel image (initmem) memory: 3532K
+[    0.362000] Write protecting the kernel read-only data: planned
+[    0.380000] Run /sbin/init as init process
+[    0.512000] systemd[1]: systemd 257.13-1~deb13u1 running in system mode (+PAM +AUDIT +SELINUX +APPARMOR +IMA +SMACK +SECCOMP +GCRYPT +GNUTLS +OPENSSL +ACL +BLKID +CURL +ELFUTILS +FIDO2 +IDN2 +IPTC +KMOD +LIBCRYPTSETUP +LIBFDISK +PCRE2 +PWQUALITY +P11KIT +QRENCODE +TPM2 +BZIP2 +LZ4 +XZ +ZLIB +ZSTD +BPF_FRAMEWORK +USERDB +SYSVINIT default-hierarchy=unified)
+[    0.514000] systemd[1]: Detected architecture x86-64.
+[    0.520000] systemd[1]: Hostname set to <pc-dev-003-ignis>.
+[    0.688000] EXT4-fs (nvme0n1p2): re-mounted 4f3a9c21-7d18-4e6b-9a52-c8b71f0e2d46 r/w.
+[    0.742000] systemd-journald[318]: Received client request to flush runtime journal.
+[    0.910000] intel_rapl_common: Found RAPL domain package
+[    0.918000] snd_hda_intel 0000:00:1f.3: bound 0000:00:02.0 (ops i915_audio_component_bind_ops [i915])
+[    1.024000] Adding 2097148k swap on /dev/nvme0n1p3.  Priority:-2 extents:1 across:2097148k SS
+[    1.180000] e1000e 0000:00:1f.6 eth0: NIC Link is Up 1000 Mbps Full Duplex, Flow Control: Rx/Tx
+[    1.182000] IPv6: ADDRCONF(NETDEV_CHANGE): eth0: link becomes ready

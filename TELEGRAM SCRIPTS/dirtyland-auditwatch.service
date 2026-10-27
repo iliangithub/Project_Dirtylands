@@ -1,0 +1,27 @@
+[Unit]
+# Avisa por Telegram de cada programa que ejecuta una persona en el anfitrion.
+# Complementa a dirtyland-cmdwatch: aquel lee lo que se teclea en un bash,
+# este lee las llamadas execve, que es lo que ve tambien los "sh", los
+# "python -c" y los binarios sueltos.
+Description=Dirtyland: avisos de ejecucion (auditd) por Telegram
+Documentation=file:/opt/dirtyland/docs/
+# auditd tiene que estar escribiendo antes de que haya nada que leer.
+After=auditd.service network-online.target
+Wants=auditd.service
+
+[Service]
+Type=simple
+ExecStart=/opt/dirtyland/monitor/auditd-watch.py
+Restart=always
+RestartSec=10
+# Lee /var/log/audit/audit.log, que es de root y solo de root.
+User=root
+# No necesita nada mas que leer un fichero y lanzar send-alert.sh.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/dirtyland/monitor
+
+[Install]
+WantedBy=multi-user.target

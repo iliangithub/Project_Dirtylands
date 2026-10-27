@@ -1,0 +1,11 @@
+# De donde viene esta copia del repositorio.
+#
+# Si estas leyendo esto con los "$Format" todavia puestos, es que estas en la
+# copia de trabajo (o alguien se trajo la carpeta a mano, que es justo lo que
+# el README prohibe). En la copia que viaja a la VPS estos valores vienen ya
+# rellenos, porque `git archive` los sustituye al construir el tar.
+#
+# Lo lee ~/voy_al_dia.py para poder decir de que version es lo que hay puesto.
+commit  f3b25a442d19a212a0411fd166270e1d63fdde4a
+fecha   2026-10-13T00:00:00Z
+ref     HEAD -> main, origin/main, origin/HEAD

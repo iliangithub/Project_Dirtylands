@@ -1,0 +1,396 @@
+; ---------------------------------------------------------------------------
+; Configuracion del reporter de Dirtyland  (un solo fichero para los dos
+; honeypots: Cowrie y Dionaea comparten estado, cuotas y listas de bloqueo).
+;
+;   sudo install -m 600 -o root -g root config.ini.example \
+;        /opt/dirtyland/platform-reporter/config.ini
+;
+; El fichero DEBE quedar en modo 600. El programa se niega a arrancar si es
+; legible por otros: contiene claves de API.
+;
+; Este .example no lleva ninguna clave. Rellena los marcadores <ASI> en la
+; copia de /opt, nunca aqui. El --self-test se niega a dar por buena una
+; configuracion que aun tenga marcadores sin sustituir.
+; ---------------------------------------------------------------------------
+
+; ---------------------------------------------------------------------------
+; CLAVES DE API. Todo lo que hay que rellenar esta AQUI, y solo aqui.
+;
+; Son tres cuentas, no cinco: MalwareBazaar, ThreatFox y URLhaus cuelgan de la
+; misma cuenta de abuse.ch y comparten Auth-Key. Poner esa clave tres veces
+; solo serviria para que algun dia se pegue mal en una y falle justo esa.
+;
+; Tenerlas juntas y al principio tiene otra ventaja: para saber que secretos
+; contiene este fichero basta mirar esta seccion, sin recorrerlo entero.
+;
+; Si alguna plataforma necesitara alguna vez una cuenta propia, se le pone su
+; api_key en su seccion de mas abajo y esa manda sobre la de aqui. Es la
+; excepcion, no el camino normal.
+; ---------------------------------------------------------------------------
+[api_keys]
+virustotal = <CLAVE-API-VIRUSTOTAL>
+abusech    = <CLAVE-API-ABUSECH>
+abuseipdb  = <CLAVE-API-ABUSEIPDB>
+
+[general]
+lookback_hours = 24
+http_timeout   = 30
+log_level      = INFO
+
+; Cuanto historial de auditoria se guarda. Al final de cada pasada se tiran
+; los rechazos y los contadores de cuota mas antiguos que esto.
+;
+; NO afecta a lo que impide duplicar: las subidas a VirusTotal y MalwareBazaar
+; quedan registradas por su hash y se guardan PARA SIEMPRE, porque esa es la
+; memoria que evita volver a subir una muestra ya subida. Lo que se limpia es
+; ruido: la misma IP en enfriamiento deja una fila cada quince minutos, 96 al
+; dia, diciendo lo mismo, y sin purga la base crece millones de filas al ano.
+; Un 0 desactiva la purga por completo.
+retention_days = 30
+
+; HANDLE CON EL QUE SE FIRMA LO PUBLICADO.
+;
+; Se anade como etiqueta al final de los comentarios de VirusTotal, que son
+; publicos y permanentes. Deja el marcador o borra el valor para no firmar:
+; una cadena vacia no publica ninguna etiqueta, y el marcador sin sustituir
+; tampoco --- publicar "#<TU-HANDLE>" seria peor que no firmar.
+;
+; Es lo mismo que los nodos del VPN: se escribe AQUI y no en el repositorio,
+; porque este fichero se queda en la maquina. El handle es publico en las
+; plataformas, pero no tiene por que estar en el codigo.
+;
+; OJO, y es importante: este handle NO puede aparecer JAMAS dentro del
+; honeyfs. Ahi dentro seria el hilo que conecta el senuelo con la persona que
+; lo opera; el atacante esta dentro de la maquina, no leyendo VirusTotal.
+attribution_tag = <TU-HANDLE-EN-LAS-PLATAFORMAS>
+
+; Una sola base de estado para todo. Marcar un envio y descontar su cuota
+; tienen que ocurrir en la misma transaccion, y con bases separadas por
+; honeypot eso no se puede garantizar.
+state_db = /var/lib/dirtyland-reporter/state.sqlite3
+log_file = /var/log/dirtyland-reporter/reporter.log
+
+; ---------------------------------------------------------------------------
+; ENLACES A TUS PERFILES. Salen en el apartado "Me han baneado?" del resumen
+; diario, para poder abrirlos de un toque desde el movil.
+;
+; Van aqui y no en el repositorio por lo mismo que attribution_tag: los
+; identificadores de usuario son publicos en las plataformas, pero no tienen
+; por que estar en el codigo. Un enlace vacio o con el marcador sin sustituir
+; simplemente no se muestra.
+;
+; El nombre de cada clave es el texto del enlace, asi que ponlo legible.
+; ---------------------------------------------------------------------------
+[perfiles]
+MalwareBazaar = <https://bazaar.abuse.ch/user/TU-ID/>
+ThreatFox     = <https://threatfox.abuse.ch/user/TU-ID/>
+URLhaus       = <https://urlhaus.abuse.ch/user/TU-ID/>
+abuse.ch      = <https://community.abuse.ch/u/TU-USUARIO>
+AbuseIPDB     = <https://www.abuseipdb.com/user/TU-ID>
+VirusTotal    = <https://www.virustotal.com/gui/user/TU-HANDLE>
+
+[paths]
+; --- Cowrie. Deja en blanco cowrie_log_dir para no recoger de Cowrie.
+cowrie_log_dir  = /var/lib/docker/volumes/dirtyland_cowrie-var/_data/log/cowrie
+cowrie_log_glob = cowrie.json*
+downloads_dir   = /var/lib/docker/volumes/dirtyland_cowrie-var/_data/lib/cowrie/downloads
+
+; EN QUE HUSO ESCRIBE COWRIE SUS MARCAS DE TIEMPO.
+;
+; Tiene que coincidir con la zona horaria DEL CONTENEDOR de Cowrie, que es la
+; del senuelo (aqui Europe/Kyiv, por la identidad de la maquina), no la del
+; anfitrion. Si el contenedor va en UTC, deja UTC.
+;
+; Hace falta porque Cowrie firma sus marcas con una "Z" --que significa UTC--
+; pero escribe la hora LOCAL. Con el senuelo en Kyiv son tres horas de mas, y
+; el fallo no da la cara en ningun sitio: la cadena es ISO valida y se
+; interpreta sin error. Lo unico que pasa es que AbuseIPDB recibe denuncias
+; fechadas en el futuro, que ademas de ser rechazables son datos falsos en una
+; base que usa mucha gente. Dionaea no tiene el problema: guarda epoch.
+;
+; No se puede arreglar en origen. El JSON de Cowrie no trae el epoch, solo la
+; cadena; y poner TZ=UTC en el contenedor haria que el `date` de dentro del
+; senuelo dejara de verse en hora de Kyiv, que es parte de su identidad.
+;
+; Una marca con desfase NUMERICO explicito ("+03:00") se respeta tal cual: esa
+; no miente. Solo se reinterpretan la "Z" y las marcas sin huso.
+;
+; Como comprobarlo:  sudo docker exec dirtyland_cowrie \
+;   /cowrie/cowrie-env/bin/python3 -c "import time; print(time.tzname)"
+cowrie_log_tz   = Europe/Kyiv
+
+; DE QUE PUERTO HABLAMOS CUANDO DECIMOS "PUERTO".
+;
+; Cowrie escribe en su log el puerto en el que EL escucha dentro del
+; contenedor: 2222 y 2223. El atacante nunca marco esos numeros; marco el 22 y
+; el 23, y el DNAT del anfitrion los tradujo. Sin esta traduccion, AbuseIPDB
+; recibia "Target ports: 2222", que es un dato falso y ademas inutil, porque
+; nadie busca ataques al 2222.
+;
+; Rompia otra cosa que no se veia: el reporter decide "esto es SSH" mirando si
+; el 22 esta entre los puertos, y con 2222 esa comprobacion no se cumplia
+; jamas.
+;
+; Se deja tal cual salvo que el docker-compose publique otros puertos. En
+; blanco vale igual: el collector trae escrita esta misma tabla por defecto.
+cowrie_puertos_publicos = 2222:22, 2223:23
+
+; DONDE SE PUBLICA LA LISTA DE IP PROPIAS PARA EL PLUGIN DE COWRIE.
+;
+; El plugin corre DENTRO del contenedor y necesita saber que IP somos
+; nosotros: sin eso, una comprobacion propia llega como si fuera un ataque y,
+; peor, el boton de banear se ofrece sobre nuestro propio nodo de VPN.
+;
+; No se arregla montando este config.ini en el contenedor. Lleva las tres
+; claves de API, y meterlas dentro del honeypot para ahorrarse un fichero de
+; texto es cambiar una comodidad por un riesgo. Aqui se publica SOLO la
+; [blocklist], sin un secreto dentro, en un directorio que ya esta montado.
+;
+; Se reescribe en cada pasada, asi que anadir un nodo al [blocklist] llega
+; solo al plugin. Si el directorio no existe, no se hace nada.
+ips_propias_out = /opt/dirtyland/Telegram Reports/ips-propias.txt
+
+; --- Dionaea. Deja en blanco dionaea_sqlite para no recoger de Dionaea.
+dionaea_sqlite   = /var/lib/docker/volumes/dirtyland_dionaea-var/_data/lib/dionaea/dionaea.sqlite
+dionaea_binaries = /var/lib/docker/volumes/dirtyland_dionaea-var/_data/lib/dionaea/binaries
+
+; ---------------------------------------------------------------------------
+; LISTA DE BLOQUEO. Lo mas importante de este fichero.
+;
+; Todo lo que aparezca aqui no se reportara jamas. Van las IP publicas de los
+; honeypots y TODOS los nodos de salida del VPN desde los que administras: los
+; mismos que abren el puerto de SSH en nftables.
+;
+; Hay que poner todos. Al comprobar desde fuera que el senuelo esta expuesto,
+; esa conexion entra en Cowrie o Dionaea y queda como una sesion atacante mas;
+; sin la lista completa, acabariamos denunciando el nodo desde el que estabamos
+; comprobando nuestra propia maquina. Y un nodo de salida de VPN es una IP
+; compartida: denunciarla no perjudica a ningun atacante, sino a todo el que
+; use ese nodo.
+;
+; No hace falta poner rangos privados (10/8, 172.16/12, 192.168/16), loopback,
+; link-local ni CGNAT: se descartan solos por no ser direcciones globales.
+;
+; Las dos IP de la VPS estan ademas escritas en HARDCODED_NEVER_REPORT, dentro
+; de common/ipguard.py: si este fichero se edita mal o se pierde en una
+; reinstalacion, esas dos siguen protegidas.
+;
+; Los nodos del VPN NO estan alli, y no deben estarlo: ipguard.py viaja en el
+; repositorio y este fichero se queda en la maquina. Por eso son lo unico que
+; hay que escribir a mano.
+; ---------------------------------------------------------------------------
+[blocklist]
+ips   = [IP VPS], [IP VPS 2], <IPS-DE-ADMINISTRACION>
+cidrs =
+
+; ---------------------------------------------------------------------------
+; PUERTA DE MALICIOSIDAD: 12 + 3
+;
+; Para comentar, votar y publicar hacen falta >= 12 motores en malicious y
+; >= 3 motores COINCIDIENDO EN LA MISMA familia concreta (mirai, gafgyt...),
+; no genericos tipo Trojan.Generic. Doce genericos pueden ser la misma
+; heuristica repetida; tres que dicen el mismo nombre significan que se ha
+; reconocido QUE es.
+;
+; Lo que se cuenta son coincidencias, no nombres distintos. Contando nombres
+; el criterio quedaba del reves: un WannaCry que los veinte motores llaman
+; igual sumaba 1 y se rechazaba, y una muestra que nadie reconoce, con tres
+; motores adivinando tres cosas, sumaba 3 y pasaba. Ademas la familia que se
+; publica en MalwareBazaar y ThreatFox es la mayoritaria, asi que la puerta
+; mide exactamente la que se va a mandar.
+;
+; NO VERIFICADO: ni VirusTotal ni MalwareBazaar publican un umbral oficial.
+; Es criterio propio y consta como tal.
+;
+; Bajarlo de 5 hace que el self-test avise.
+; ---------------------------------------------------------------------------
+[gate]
+min_malicious = 12
+
+; ---------------------------------------------------------------------------
+; EL GOTEO: max_per_run, presente en las cinco secciones de abajo.
+;
+; Las puertas de arriba deciden QUE se puede publicar. Esto decide CUANTO de
+; una vez, y es una cosa distinta. Si una noche caen cincuenta binarios que
+; pasan todas las puertas, subir los cincuenta seguidos es indistinguible de
+; un volcado automatico, y eso es justo lo que las plataformas penalizan.
+;
+; Lo que no sale en una pasada NO se pierde: sigue dentro de lookback_hours y
+; sale en la siguiente, que con el cron son 15 minutos. En el log aparece como
+; rechazo "tope-por-pasada", diciendo que se reintenta.
+;
+; Va por pasada y no por dia a proposito: un tope diario deja salir la rafaga
+; entera de golpe y luego calla, que es exactamente el patron que se quiere
+; evitar. Este reparte siempre.
+; ---------------------------------------------------------------------------
+
+; ---------------------------------------------------------------------------
+; VirusTotal. Primer eslabon: la subida es lo que nos hace first submitter.
+; Comentario y voto NO salen aqui hasta que la muestra pasa la puerta.
+; ---------------------------------------------------------------------------
+[virustotal]
+enabled = true
+; la clave se pone en [api_keys]
+min_malicious      = 12
+; Motores que han de coincidir en la MISMA familia, no familias distintas.
+;
+; OJO A QUE AFECTA: esto ya NO bloquea la publicacion en VirusTotal. Una
+; muestra sin nombre de familia sigue siendo malware acreditado y se comenta,
+; se vota, se manda su URL a URLhaus y se denuncia el servidor que la sirvio.
+; Este umbral gobierna solo a quien publica la muestra ETIQUETADA con un
+; nombre: MalwareBazaar y ThreatFox.
+;
+; Que cuenta como "familia" lo decide la lista negra GENERICOS de
+; reporters/virustotal.py, no una lista blanca de nombres conocidos: si un
+; motor dice "redtail" y otros veintinueve lo repiten, eso es una familia.
+min_named_families = 3
+; Cada muestra gasta hasta tres: subida, comentario y voto. Seis son dos
+; muestras completas por pasada.
+max_per_run        = 6
+
+; ---------------------------------------------------------------------------
+; MalwareBazaar. Ultimo eslabon, y el que ya costo un baneo.
+;
+; NO SUBAS max_age_days. Los 10 dias NO son un margen nuestro: son la
+; POLITICA DE MALWAREBAZAAR, dicha por ellos en la pantalla de baneo de esta
+; misma cuenta: "MalwareBazaar only accepts confirmed malware samples that are
+; not older than 10 days". Subirlo repite el baneo.
+;
+; max_age_days se mide contra first_submission_date de VirusTotal, NUNCA
+; contra la fecha del fichero en disco: confundir "cuando lo capture" con "que
+; antiguedad tiene el malware" fue exactamente la causa del baneo anterior.
+;
+; Consecuencia que hay que aceptar: un senuelo que captura sobre todo familias
+; veteranas publicara POCO aqui, y eso es correcto. Cero publicaciones no
+; significa que la tuberia este rota.
+;
+; Los topes son una red de seguridad, no un objetivo: aunque fallara toda la
+; logica de unicidad, siguen haciendo imposible inundar la plataforma.
+; ---------------------------------------------------------------------------
+[malwarebazaar]
+enabled = true
+
+; --------------------------------------------------------------------------
+; QUE NO SE SUBE. Dos listas, porque los dos vetos tienen origen distinto.
+;
+; Estan AQUI y no en el codigo por una razon concreta. Consultado por correo,
+; Roman Huessy (fundador de abuse.ch) respondio: "No, there is no list of
+; disallowed malware families. If we encounter any issues with your
+; submissions we would for sure contact you." O sea: no hay catalogo publico y
+; el aviso es REACTIVO, por correo. Una lista asi hay que poder ampliarla el
+; dia que escriban, sin tocar un fichero de programa ni volver a desplegar.
+;
+; Comparacion EN MINUSCULAS y POR COINCIDENCIA PARCIAL, contra las etiquetas
+; crudas de los motores de VirusTotal Y contra nuestra clasificacion de
+; familia. Parcial porque el mismo bicho se etiqueta de diez maneras
+; ---"Ransom.WannaCry.A", "Trojan.WannaCrypt", "W32/WCry.gen"--- y exigir
+; coincidencia exacta dejaria pasar nueve.
+;
+; CUIDADO al anadir terminos cortos: al ser subcadena, "cry" vetaria tambien
+; cryptolocker y cualquier otro que lo lleve dentro. Nombres completos de
+; familia, y de cinco letras para arriba.
+;
+; Si abuse.ch escribe pidiendo que se deje de enviar algo, se anade aqui y se
+; recrea el contenedor. Nada mas. Si una lista se deja VACIA, el --self-test
+; lo dice: no es un estado normal.
+; --------------------------------------------------------------------------
+
+; 1. WannaCry. NO viene de la FAQ: viene de una indicacion directa de abuse.ch
+;    por correo ---"You can skip WannaCry, rest is fine"---. La consulta esta
+;    citada en la cabecera de reporters/malwarebazaar.py.
+;
+;    Ojo: la compuerta de frescura ya descarta por si sola el WannaCry
+;    canonico, porque mide cuanto lleva conocido ESE hash en VirusTotal y los
+;    hashes clasicos llevan anos. Esta lista actua sobre las variantes
+;    reempaquetadas con hash nuevo, que son las que se colarian.
+familias_vetadas = wannacry, wannacrypt, wanacrypt0r, wcry, wcrypt
+
+; 2. Infectores de fichero clasicos. Este SI es el veto escrito y sigue
+;    vigente: la FAQ pide que no se suban "file infectors and/or worms". La
+;    misma consulta aclaro que la regla apunta a los infectores CLASICOS y no
+;    a cualquier familia autopropagante: Mirai es aceptable. Por eso no se
+;    filtra por la palabra "worm" ni por la categoria que declare un motor,
+;    que tiraria justo lo que captura el senuelo de telnet.
+;
+;    Pesa sobre todo en la ruta de Dionaea, que es por donde llegan los PE.
+;    Ademas de estos nombres, el codigo veta los veredictos que empiezan por
+;    "Virus." o "W32.Virus", que declaran un infector sin nombrar familia.
+infectores_de_fichero = virut, sality, ramnit, expiro, neshta, parite, virlock
+
+; la clave se pone en [api_keys]
+max_age_days           = 10
+max_uploads_per_day    = 5
+max_uploads_per_week   = 20
+burst_window_minutes   = 60
+burst_size_tolerance_pct = 5.0
+; La que ya costo un baneo. Seis ENVIOS son tres MUESTRAS: cada una gasta su
+; subida y su comentario de atribucion. Con el tope diario de 5, tres por
+; pasada solo sirven para que esas cinco no salgan todas seguidas.
+; Tiene que ser PAR: con un impar, la ultima subida de la pasada se queda sin
+; su comentario, y ese comentario no se vuelve a intentar nunca.
+max_per_run            = 6
+
+; ---------------------------------------------------------------------------
+; ThreatFox. Solo IOC vetados, y solo con familia traducible a un nombre de
+; Malpedia. Sin familia reconocida no se envia nada: preferimos reportar de
+; menos antes que meter ruido en su base.
+;
+; NO VERIFICADO: la documentacion da el rango 0-100 de confidence_level y su
+; valor por defecto, pero no define que significa cada tramo. 75 es criterio
+; propio.
+; ---------------------------------------------------------------------------
+[threatfox]
+enabled = true
+; la clave se pone en [api_keys]
+confidence_level = 75
+; Comparte cuenta con MalwareBazaar y URLhaus: un baneo aqui apaga las tres.
+max_per_run      = 3
+; Tu nombre de usuario EN ThreatFox, tal cual sale en "You are viewing the
+; user profile of ...". No es el enlace de [perfiles], que lleva un id.
+;
+; Se usa despues de publicar: se consulta el indicador y se mira quien figura
+; como reporter. Si eres tu, el indicador es nuevo; si es otro, ThreatFox
+; fundio lo tuyo con una entrada suya y tu contador de contribuciones no
+; sube. Sin esto se publica igual, pero el resumen no puede distinguir las
+; dos cosas y dira "sin verificar".
+usuario          = <TU-USUARIO-EN-THREATFOX>
+
+; ---------------------------------------------------------------------------
+; URLhaus. Sus dos fuentes oficiales se contradicen sobre la autenticacion: la
+; pagina del API dice que la clave va en el cuerpo JSON, y el script de
+; referencia que ella misma enlaza la manda en la cabecera Auth-Key. Se sigue
+; el script, por ser codigo suyo que funciona. NO VERIFICADO: esta plataforma
+; no ha recibido nunca una peticion nuestra.
+;
+; Solo se envian URL de las que capturamos el binario. Su politica pide no
+; enviar URL caidas, pero comprobarlo obligaria al honeypot a hacer una
+; peticion saliente al servidor del atacante, y eso no se hace: tener el
+; fichero en disco ya prueba que la URL servia el payload cuando la vimos.
+; ---------------------------------------------------------------------------
+[urlhaus]
+enabled = true
+; la clave se pone en [api_keys]
+max_url_age_hours = 48
+; Misma cuenta que las otras dos, y su formato no se ha probado nunca contra
+; la API real.
+max_per_run       = 3
+
+; ---------------------------------------------------------------------------
+; AbuseIPDB. El unico que publica direcciones IP.
+;
+; Su politica prohibe reportar SYN floods y UDP porque el origen puede ir
+; falsificado. Traduccion: sin handshake TCP completado no se reporta, y eso
+; no es configurable.
+; ---------------------------------------------------------------------------
+[abuseipdb]
+enabled = true
+; la clave se pone en [api_keys]
+; Mas alto que las demas, y no por capricho. Es la unica plataforma cuya
+; politica cuenta con recibir denuncias de honeypots en volumen: el limite son
+; 1000 al dia. Y hay una razon tecnica: solo se recogen las ultimas
+; lookback_hours, asi que si el tope va por debajo del ritmo al que llegan
+; atacantes, la cola nunca se vacia y los mas antiguos se caen de la ventana
+; sin haberse reportado jamas.
+max_per_run               = 25
+min_hours_between_reports = 24
+min_events_for_bruteforce = 5

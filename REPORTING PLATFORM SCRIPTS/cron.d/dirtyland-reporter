@@ -1,0 +1,53 @@
+# ---------------------------------------------------------------------------
+# Dirtyland: reporter de plataformas.
+#
+#   sudo install -m 644 -o root -g root cron.d/dirtyland-reporter \
+#        /etc/cron.d/dirtyland-reporter
+#
+# La linea activa es la de SIMULACION. Deja que corra unos dias y revisa el
+# log: veras exactamente que se habria enviado y que se rechazo, con el motivo
+# de cada rechazo. Solo cuando el resultado te convenza, comenta esa linea y
+# descomenta la de --live.
+#
+# Ese es el orden correcto y no es una formalidad: la cuenta de MalwareBazaar
+# ya se perdio una vez por publicar antes de comprobar.
+#
+# Cada 15 minutos, y no cada 3: el rechequeo diferido significa que las
+# muestras se juzgan horas despues de capturarlas, asi que mirar mas a menudo
+# no adelanta nada y solo gasta cuota de API.
+# ---------------------------------------------------------------------------
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+*/15 * * * * root /opt/dirtyland/platform-reporter/malware-watch.sh
+#*/15 * * * * root /opt/dirtyland/platform-reporter/malware-watch.sh --live
+
+# Comprobacion diaria de que la configuracion y las barreras siguen sanas.
+# Si falla, el codigo 3 queda en el syslog.
+17 6 * * * root /usr/bin/python3 /opt/dirtyland/platform-reporter/orchestrator.py -c /opt/dirtyland/platform-reporter/config.ini --self-test
+
+# Vigilante del cortacircuitos. Avisa por el bot del ANFITRION --- el del
+# resumen diario, no el del senuelo --- en cuanto la cuenta de abuse.ch deja
+# de publicar, y otra vez cuando se rearma.
+#
+# Cada 5 minutos y no cada 15: cuando esto salta, las tres plataformas de
+# abuse.ch se paran hasta que alguien las rearme A MANO. Esperar al resumen de
+# la manana siguiente son hasta 24 h sin publicar y, peor, 24 h sin saber que
+# abuse.ch nos esta rechazando algo. No consume cuota de ninguna API: es una
+# lectura de la base local.
+*/5 * * * * root /opt/dirtyland/monitor/breaker-watch.sh
+
+# Vigilante de la cuota diaria. Avisa por el bot del ANFITRION en cuanto una
+# plataforma con cupo publicado (AbuseIPDB, VirusTotal) lo agota, y otra vez
+# cuando vuelve al dia siguiente.
+#
+# POR QUE HACE FALTA: agotar la cuota NO es un error --- QuotaExceeded es el
+# limitador funcionando --- y por eso no sale por ningun lado. El 2026-09-11
+# AbuseIPDB se quedo sin cupo a las 15:01 y el senuelo estuvo cinco horas y
+# media sin denunciar a nadie, sin que nada lo dijera. Y con lookback_hours =
+# 24, lo que no sale hoy no sale nunca.
+#
+# A los CINCO MINUTOS de cada pasada del reporter, no a la vez: lo que se mira
+# es el contador que esa pasada acaba de dejar, y arrancar los dos juntos solo
+# gana un choque en la misma base.
+5,20,35,50 * * * * root /opt/dirtyland/monitor/cuota-watch.sh

@@ -1,0 +1,66 @@
+# Bytecode de Python. No tiene por que estar en el repositorio.
+__pycache__/
+*.py[cod]
+
+# Secretos. Nunca deben llegar aqui: el .example es lo que se versiona.
+config.ini
+telegram.env
+# EL QUE DE VERDAD SE COLO. El 2026-08-18 entro un "TELEGRAM SCRIPTS/
+# telegram.cfg" con el bot_token y el chat_id de verdad dentro; se quito ese
+# mismo dia, pero se quedo en el historial. Estaban ignorados config.ini y
+# telegram.env, y este no. Sin barra delante, la regla vale en cualquier
+# carpeta; el .example NO casa con ella y se sigue rastreando, que es lo que
+# se quiere.
+telegram.cfg
+*.env
+
+# Estado y registros en tiempo de ejecucion
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+*.log
+# ...MENOS las muestras de las pruebas. Esta excepcion existe porque la regla
+# de arriba se trago "TELEGRAM SCRIPTS/tests/muestras/audit-real.log" y por eso
+# esa muestra NUNCA se comiteo: test_auditd_watch.py lleva desde entonces sin
+# poder ejecutarse ni una vez en una copia recien clonada, y como la lista del
+# 3.7.10 corta la salida a la ultima linea, no se veia como un fallo sino como
+# un hueco. Son capturas reales pegadas tal cual, y de eso vive esa suite: el
+# formato lo dicta auditd y no lo que uno deduce del manual.
+!TELEGRAM SCRIPTS/tests/muestras/*.log
+
+# Las tablas de paises. Son DATOS DERIVADOS: los genera
+# TELEGRAM SCRIPTS/geoip/generar-tabla-paises.py de fuentes publicas, y la
+# propia VPS los rehace cada quince dias por cron. Versionarlos serian 17 MB
+# reescritos enteros en cada regeneracion, y el mismo criterio que ya se
+# aplica al fs.pickle y al dpkg-packages.tsv: lo que se genera no se versiona.
+TELEGRAM SCRIPTS/geoip/ubicacion-v*.txt
+TELEGRAM SCRIPTS/geoip/registro-v*.txt
+TELEGRAM SCRIPTS/geoip/generada.txt
+
+# Copias de seguridad sueltas
+*.bak
+*.bak-*
+*~
+
+# Los informes de ANALISIS/analisis.py. LA HERRAMIENTA SI VA AL REPOSITORIO;
+# SU SALIDA NO. Llevan IPs y hashes de capturas reales, y ademas van al
+# documento principal, no aqui.
+#
+# El patron es "analisis-senuelo-" y no "analisis-" a secas a proposito: en
+# DOCS hay analisis escritos a mano ---analisis-redtail-2026-08-22.md--- que
+# SI se versionan, y una regla mas ancha los habria dejado de rastrear sin
+# que nadie se diera cuenta.
+analisis-senuelo-*.md
+analisis-senuelo-*.html
+
+# Las fichas de "3.6 Para facilitarnos la vida/que_hizo_esta_ip.py". El mismo
+# criterio que los informes de arriba, y con mas motivo: el .txt lleva IPs,
+# hashes y las ordenes de un atacante, y el .tar.gz.enc lleva LAS MUESTRAS
+# dentro ---cifradas con 1234, que no es un secreto---. Se quedan en la VPS o
+# en el equipo de trabajo; aqui no entran.
+#
+# Se ignoran aunque lo normal sea que ni se acerquen: nacen en el home de la
+# VPS, y el camino por el que llegarian aqui es bajarlas con `scp` estando
+# dentro de la carpeta del repositorio, que es un despiste de un segundo.
+ficha-*.txt
+ficha-*.tar.gz.enc

@@ -1,0 +1,22 @@
+# /opt/dirtyland/Telegram Reports/telegram.cfg
+#
+# Tokens del bot que manda las alertas de Cowrie.
+# Lo lee "telegram_alert_cowrie.py" (constante TELEGRAM_CFG_PATH). De este
+# fichero salen UNICAMENTE tres claves: enabled, bot_token y chat_id; todo lo
+# demas son constantes dentro del propio plugin.
+#
+# Se monta :ro en el contenedor EN LA MISMA RUTA que en el host, para que la
+# constante del plugin sea valida dentro y fuera:
+#   - "/opt/dirtyland/Telegram Reports/telegram.cfg:/opt/dirtyland/Telegram Reports/telegram.cfg:ro"
+#
+# Permisos: 600 y propietario = el uid con el que Cowrie corre dentro del
+# contenedor (apartado 3.4.2.7 del README). Este fichero NUNCA se sube al
+# repositorio: contiene el token del bot.
+#
+# El token se obtiene de @BotFather (/mybots). El chat_id, con el script en
+# base64 del apartado 3.4.2.7, despues de haberle escrito algo al bot.
+
+[output_telegram]
+enabled = true
+bot_token = 123456789:AAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+chat_id = -1001234567890

@@ -1,0 +1,123 @@
+#!/bin/sh
+# /usr/local/sbin/telegram-ban-watcher  —  root:root 0755
+#
+# QUE ES: el puente entre el contenedor y el cortafuegos del host. Corre
+# como servicio systemd, en bucle, mirando cada 2 segundos si el plugin de
+# Cowrie ha dejado alguna IP en la cola. Por cada una llama a
+# telegram-notification-ban y escribe el resultado donde el plugin lo lee,
+# para que el boton de Telegram pase a "BLOCKED" o te cuente el error.
+#
+# POR QUE HACE FALTA: el plugin corre dentro del contenedor de Cowrie, que
+# no tiene nft, no tiene sudo y lleva no-new-privileges. No puede aplicar
+# reglas, y es justo lo que queremos: el honeypot pide, el host decide.
+#
+# FICHEROS QUE USA (el directorio "state" del bind-mount rw):
+#     state/ban_queue    <- lo escribe el plugin al pulsar tu el boton
+#     state/ban_results  -> lo escribe este servicio con el resultado
+#
+# COMO SE INSTALA (el binario, junto con el baneador):
+#
+#     sudo install -o root -g root -m 0755 \
+#       "/opt/dirtyland/Telegram Reports/telegram-notification-ban" \
+#       "/opt/dirtyland/Telegram Reports/telegram-ban-watcher" \
+#       /usr/local/sbin/
+#
+# Y el servicio que lo mantiene vivo (ver telegram-ban-watcher.service):
+#
+#     sudo install -o root -g root -m 0644 \
+#       "/opt/dirtyland/Telegram Reports/telegram-ban-watcher.service" \
+#       /etc/systemd/system/
+#     sudo systemctl daemon-reload
+#     sudo systemctl enable --now telegram-ban-watcher
+#
+# COMO SE COMPRUEBA (simula una pulsacion del boton sin usar Telegram):
+#
+#     echo "$(date -Is) 203.0.113.99" | sudo tee -a "/opt/dirtyland/Telegram Reports/state/ban_queue"
+#     sleep 4
+#     cat "/opt/dirtyland/Telegram Reports/state/ban_results"
+#     sudo journalctl -u telegram-ban-watcher -n 20
+#
+# SI ALGO VA MAL: si el servicio esta parado, el plugin te avisa por
+# Telegram a los 90 segundos en vez de quedarse callado.
+#
+#     sudo systemctl status telegram-ban-watcher
+#
+# El contenedor de Cowrie no puede (ni debe) aplicar reglas de nftables:
+# no tiene nft, no tiene sudo, y el compose lleva no-new-privileges. Asi que
+# el plugin solo ESCRIBE una peticion en ban_queue, y esto la lee, la aplica
+# y contesta en ban_results. El contenedor pide; el host decide y ejecuta.
+#
+# La cola se rota con mv (atomico en el mismo sistema de ficheros) antes de
+# procesarla, para no perder lo que el plugin escriba mientras trabajamos.
+
+set -u
+
+DIR="/opt/dirtyland/Telegram Reports/state"
+QUEUE="$DIR/ban_queue"
+WORK="$DIR/ban_queue.processing"
+RESULTS="$DIR/ban_results"
+BANNER="/usr/local/sbin/telegram-notification-ban"
+INTERVAL=2
+
+log() { logger -t telegram-ban-watcher "$1"; echo "$1"; }
+
+[ -x "$BANNER" ] || { log "FALTA $BANNER"; exit 1; }
+mkdir -p "$DIR"
+
+# --- NO VIGILAR A CIEGAS -----------------------------------------------------
+# Este servicio corre como root, pero el .service le recorta las capacidades a
+# CAP_NET_ADMIN y CAP_NET_RAW, asi que se queda SIN CAP_DAC_OVERRIDE: deja de
+# poder saltarse los permisos de fichero. Y el buzon pertenece al uid con el
+# que Cowrie corre DENTRO del contenedor, no a root.
+#
+# Con el directorio en 0700 eso significa que root no puede ni entrar. Lo malo
+# no es el fallo, es COMO fallaba: `[ -s "$QUEUE" ]` devuelve falso igual si el
+# fichero esta vacio que si no se puede mirar, asi que el bucle daba vueltas
+# cada dos segundos sin ver nada, sin un solo error y sin una linea de log. Un
+# baneo pedido el 2026-08-22 a las 14:16 seguia en la cola horas despues, con
+# el servicio en "active (running)" y el journal vacio.
+#
+# El arreglo de verdad es que el directorio sea 0770 con grupo root (lo hace el
+# README). Esto de aqui es para que, si alguna vez vuelve a no poder, se ENTERE
+# quien lo mire en vez de creerse que no hay trabajo.
+if [ ! -r "$DIR" ] || [ ! -w "$DIR" ] || [ ! -x "$DIR" ]; then
+    log "NO PUEDO USAR EL BUZON $DIR (uid=$(id -u), permisos=$(stat -c '%a %U:%G' "$DIR" 2>/dev/null))"
+    log "sin acceso al buzon los baneos se encolan y NO se aplican jamas."
+    log "arreglo: chmod 770 al directorio, que su grupo es root."
+    exit 1
+fi
+
+# Recupera un lote a medias si el servicio murio en mitad del trabajo.
+[ -f "$WORK" ] && log "recuperando lote pendiente de un arranque anterior"
+
+log "vigilando $QUEUE"
+
+while :; do
+    if [ -f "$WORK" ] || { [ -s "$QUEUE" ] && mv "$QUEUE" "$WORK"; }; then
+        while read -r stamp ip origen rest; do
+            [ -n "${ip:-}" ] || continue
+            # El tercer campo dice si lo pidio el boton o el baneo automatico.
+            # Las peticiones viejas no lo traen: se toman por manuales, que es
+            # lo que eran cuando solo existia el boton.
+            case "${origen:-}" in auto|manual) ;; *) origen=manual ;; esac
+
+            if out=$("$BANNER" "$ip" "$origen" 2>&1); then
+                printf '%s %s OK %s\n' \
+                    "$(date -Is)" "$ip" "$out" >> "$RESULTS"
+                log "baneada $ip (pedida a las $stamp)"
+            else
+                rc=$?
+                printf '%s %s FAIL rc=%s %s\n' \
+                    "$(date -Is)" "$ip" "$rc" "$out" >> "$RESULTS"
+                log "fallo al banear $ip: rc=$rc $out"
+            fi
+        done < "$WORK"
+        rm -f "$WORK"
+
+        # El fichero de respuestas no crece para siempre.
+        if [ "$(wc -l < "$RESULTS" 2>/dev/null || echo 0)" -gt 5000 ]; then
+            tail -n 1000 "$RESULTS" > "$RESULTS.tmp" && mv "$RESULTS.tmp" "$RESULTS"
+        fi
+    fi
+    sleep "$INTERVAL"
+done

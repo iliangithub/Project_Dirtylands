@@ -1,0 +1,37 @@
+#!/usr/sbin/nft -f
+
+# Reseteamos solo NUESTRA tabla, nunca las de Docker
+# ==========================================================
+# LO MISMO QUE EL PARTE 1 SOLO HEMOS BORRADO EL FLUSHRULES
+#
+# Y AÑADIDO EL "add table inet filter" y "delete table inet filter"
+#
+# NO EXPONEMOS NADA AÚN
+#
+# ESTAS REGLAS SON LAS QUE ANTES SE METÍAN CON UN "tee EOF EOF" ese comando ya NO está
+# porque literalmente lo he remplazado por el nano que se ve.
+# ==========================================================
+
+add table inet filter
+delete table inet filter
+
+table inet filter {
+    chain input {
+        type filter hook input priority 0; policy drop;
+        ct state established,related accept
+        ct state invalid drop
+        iif "lo" accept
+        ip protocol icmp accept
+        ip6 nexthdr icmpv6 accept
+        ip saddr <IP Proxy Principal> tcp dport <Futuro puerto SSH> accept # proxy principal
+        ip saddr <IP Proxy de segundo pais> tcp dport <Futuro puerto SSH> accept # proxy de respaldo 1
+        ip saddr <IP Proxy de tercer pais> tcp dport <Futuro puerto SSH> accept # proxy de respaldo 2
+        tcp dport 22 accept
+    }
+    chain forward {
+        type filter hook forward priority 0; policy drop;
+    }
+    chain output {
+        type filter hook output priority 0; policy accept;
+    }
+}

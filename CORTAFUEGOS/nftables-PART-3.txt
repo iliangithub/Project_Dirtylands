@@ -1,0 +1,63 @@
+#!/usr/sbin/nft -f
+
+# =============================
+# Estas son las reglas originales del parte 3, las que antes llamabamos base64 egress. Porque por algún motivo las introducíamos vía base64, ni si quiera con el "tee"!
+#
+# Aquí es donde se securiza el docker compose y evitamos catástrofes.
+#
+# NO EXPONEMOS NADA TODAVÍA
+#
+# =============================
+
+add table inet filter
+delete table inet filter
+
+table inet filter {
+    chain input {
+        type filter hook input priority 0; policy drop;
+        ct state established,related accept
+        ct state invalid drop
+        iif "lo" accept
+        ip protocol icmp accept
+        ip6 nexthdr icmpv6 accept
+        ip saddr <IP Proxy Principal> tcp dport <Futuro puerto SSH> accept # proxy principal
+        ip saddr <IP Proxy de segundo pais> tcp dport <Futuro puerto SSH> accept # proxy de respaldo 1
+        ip saddr <IP Proxy de tercer pais> tcp dport <Futuro puerto SSH> accept # proxy de respaldo 2
+        tcp dport 22 accept
+    }
+
+    chain forward {
+        type filter hook forward priority 0; policy drop;
+
+        # --- EGRESS de los contenedores (salida controlada) ---
+        ct state established,related accept
+        ct state invalid drop
+
+        # Anti pivoteo: redes privadas, enlace local, CGNAT y la propia IP publica
+        iifname "dirtyland0" ip saddr 172.20.0.0/24 ip daddr 10.0.0.0/8 log prefix "DL-EGRESS-PRIV " drop
+        iifname "dirtyland0" ip saddr 172.20.0.0/24 ip daddr 172.16.0.0/12 log prefix "DL-EGRESS-PRIV " drop
+        iifname "dirtyland0" ip saddr 172.20.0.0/24 ip daddr 192.168.0.0/16 log prefix "DL-EGRESS-PRIV " drop
+        iifname "dirtyland0" ip saddr 172.20.0.0/24 ip daddr 169.254.0.0/16 log prefix "DL-EGRESS-PRIV " drop
+        iifname "dirtyland0" ip saddr 172.20.0.0/24 ip daddr 100.64.0.0/10 log prefix "DL-EGRESS-PRIV " drop
+        iifname "dirtyland0" ip saddr 172.20.0.0/24 ip daddr [IP VPS] log prefix "DL-EGRESS-HOST " drop
+
+        # Anti spam: SMTP saliente
+        iifname "dirtyland0" ip saddr 172.20.0.0/24 tcp dport { 25, 465, 587 } log prefix "DL-EGRESS-SMTP " drop
+
+        # Anti amplificacion: todo UDP saliente
+        iifname "dirtyland0" ip saddr 172.20.0.0/24 meta l4proto udp log prefix "DL-EGRESS-UDP " drop
+
+        # Salida TCP con limite de ritmo (descarga si, escaneo/DDoS no)
+        iifname "dirtyland0" ip saddr 172.20.0.0/24 tcp flags syn limit rate 10/minute burst 20 packets accept
+        iifname "dirtyland0" ip saddr 172.20.0.0/24 tcp flags syn log prefix "DL-EGRESS-RATE " drop
+        iifname "dirtyland0" ip saddr 172.20.0.0/24 ip protocol tcp accept
+
+        # Cajon de seguridad
+        iifname "dirtyland0" ip saddr 172.20.0.0/24 log prefix "DL-EGRESS-OTHER " drop
+    }
+
+    chain output {
+        type filter hook output priority 0; policy accept;
+    }
+}
+

@@ -1,0 +1,64 @@
+#!/usr/sbin/nft -f
+
+# Limpiamos cualquier regla previa antes de cargar esta configuracion
+flush ruleset
+
+# ---------------------------------------------------------------
+# TABLA PRINCIPAL (maneja IPv4 e IPv6 a la vez gracias a "inet")
+# ---------------------------------------------------------------
+table inet filter {
+
+    # -----------------------------------------------------------
+    # CADENA DE ENTRADA (trafico que llega a la maquina)
+    # Politica por defecto: DROP (denegar todo lo no permitido)
+    # -----------------------------------------------------------
+    chain input {
+        type filter hook input priority 0; policy drop;
+
+        # Permitir conexiones ya establecidas o relacionadas
+        # (respuestas a lo que la propia maquina inicia hacia fuera)
+        ct state established,related accept
+
+        # Descartar paquetes invalidos (estado corrupto o anomalo)
+        ct state invalid drop
+
+        # Permitir todo el trafico de loopback (interfaz interna lo)
+        iif "lo" accept
+
+        # Permitir ICMP de IPv4 (ping y tipos necesarios para la red)
+        ip protocol icmp accept
+
+        # Permitir ICMPv6 (imprescindible para el funcionamiento de IPv6,
+        # aunque no expongamos servicios por IPv6)
+        ip6 nexthdr icmpv6 accept
+
+        # SSH de administracion: el puerto elegido SOLO desde la IP de los proxys SOCKETs5 de Mullvad.
+        ip saddr <IP Proxy Principal> tcp dport <Futuro puerto SSH> accept # proxy principal
+        ip saddr <IP Proxy de segundo pais> tcp dport <Futuro puerto SSH> accept # proxy de respaldo 1
+        ip saddr <IP Proxy de tercer pais> tcp dport <Futuro puerto SSH> accept # proxy de respaldo 2
+
+        # Esto lo dejamos porque si no cerraríamos nuestra sesión SSH. Además, señuelo Cowrie: puerto 22 abierto a cualquier IP
+        tcp dport 22 accept
+
+        # (Aqui añadiremos mas adelante los puertos de Dionaea)
+
+        # Todo lo demas cae por la politica "policy drop" de arriba
+    }
+
+    # -----------------------------------------------------------
+    # CADENA DE REENVIO (trafico que atraviesa la maquina hacia otras)
+    # No somos un router, asi que lo denegamos entero
+    # -----------------------------------------------------------
+    chain forward {
+        type filter hook forward priority 0; policy drop;
+    }
+
+    # -----------------------------------------------------------
+    # CADENA DE SALIDA (trafico que la maquina genera hacia fuera)
+    # De momento la dejamos permisiva (policy accept).
+    # El filtrado de egress selectivo lo montaremos al desplegar Cowrie
+    # -----------------------------------------------------------
+    chain output {
+        type filter hook output priority 0; policy accept;
+    }
+}
